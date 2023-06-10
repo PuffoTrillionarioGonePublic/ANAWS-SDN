@@ -35,6 +35,7 @@ public class RoutingDecision implements IRoutingDecision {
     protected RoutingAction action;
     protected Match match;
     protected int hardTimeout;
+	protected int idleTimeout;
     protected SwitchPort srcPort;
     protected IDevice srcDevice;
     protected List<IDevice> destDevices;
@@ -52,6 +53,7 @@ public class RoutingDecision implements IRoutingDecision {
         this.action = action;
         this.match = null;
         this.hardTimeout = ForwardingBase.FLOWMOD_DEFAULT_HARD_TIMEOUT;
+		this.idleTimeout = ForwardingBase.FLOWMOD_DEFAULT_IDLE_TIMEOUT;
     }
     
     @Override
@@ -115,6 +117,16 @@ public class RoutingDecision implements IRoutingDecision {
     public void setHardTimeout(short hardTimeout) {
         this.hardTimeout = hardTimeout;
     }
+
+	@Override
+	public int getIdleTimeout() {
+		return idleTimeout;
+	}
+
+	@Override
+	public void setIdleTimeout(short idleTimeout) {
+		this.idleTimeout = idleTimeout;
+	}
 
 	@Override
 	public U64 getDescriptor() {

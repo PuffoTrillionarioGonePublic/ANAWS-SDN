@@ -160,9 +160,10 @@ public abstract class ForwardingBase implements IOFMessageListener {
      *        OFFlowMod.OFPFC_MODIFY etc.
      * @return true if a packet out was sent on the first-hop switch of this route
      */
-    public boolean pushRoute(Path route, Match match, OFPacketIn pi,
-            DatapathId pinSwitch, U64 cookie, FloodlightContext cntx,
-            boolean requestFlowRemovedNotification, OFFlowModCommand flowModCommand, boolean packetOutSent) {
+	public boolean pushRoute(Path route, Match match, OFPacketIn pi,
+			DatapathId pinSwitch, U64 cookie, FloodlightContext cntx,
+			boolean requestFlowRemovedNotification, OFFlowModCommand flowModCommand, boolean packetOutSent,
+			int idleTimeout, int hardTimeout) {
 
         List<NodePortTuple> switchPortList = route.getPath();
 
@@ -221,8 +222,8 @@ public abstract class ForwardingBase implements IOFMessageListener {
             }
 
             fmb.setMatch(mb.build())
-            .setIdleTimeout(FLOWMOD_DEFAULT_IDLE_TIMEOUT)
-            .setHardTimeout(FLOWMOD_DEFAULT_HARD_TIMEOUT)
+            .setIdleTimeout(idleTimeout)
+            .setHardTimeout(hardTimeout)
             .setBufferId(OFBufferId.NO_BUFFER)
             .setCookie(cookie)
             .setOutPort(outPort)

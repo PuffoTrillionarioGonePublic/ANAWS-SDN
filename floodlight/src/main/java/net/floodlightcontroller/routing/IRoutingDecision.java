@@ -32,6 +32,7 @@ public interface IRoutingDecision {
         /*
          * NONE:                    NO-OP, continue with the packet processing chain
          * DROP:                    Drop this packet and this flow
+		 * DROP_TCP:				Drop this TCP connection by sending a RST packet
          * FORWARD:                 Forward this packet, and this flow, to the first
          *                          (and only device) in getDestinationDevices(),
          *                          if the destination is not known at this time,
@@ -43,7 +44,7 @@ public interface IRoutingDecision {
          * MULTICAST:               Multicast this packet to all the interfaces
          *                          and devices attached
          */
-        NONE, DROP, FORWARD, FORWARD_OR_FLOOD, MULTICAST
+        NONE, DROP, DROP_TCP, FORWARD, FORWARD_OR_FLOOD, MULTICAST
     }
 
     public static final FloodlightContextStore<IRoutingDecision> rtStore =
@@ -64,6 +65,8 @@ public interface IRoutingDecision {
     public void setMatch(Match match);
     public int getHardTimeout();
     public void setHardTimeout(short hardTimeout);
+	public int getIdleTimeout();
+	public void setIdleTimeout(short idleTimeout);
     public U64 getDescriptor();
     public void setDescriptor(U64 descriptor);
     

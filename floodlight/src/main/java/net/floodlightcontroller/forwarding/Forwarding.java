@@ -227,6 +227,10 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
                 case DROP:
                     doDropFlow(sw, pi, decision, cntx);
                     return Command.CONTINUE;
+				
+				case DROP_TCP:
+					doDropFlowTcp(sw, pi, decision, cntx);
+					return Command.CONTINUE;
 
                 default:
                     log.error("Unexpected decision made for this packet-in={}", pi, decision.getRoutingAction());
@@ -478,7 +482,9 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 
                 pushRoute(path, m, pi, sw.getId(), cookie,
                         cntx, requestFlowRemovedNotifn,
-                        OFFlowModCommand.ADD, false);
+                        OFFlowModCommand.ADD, false,
+						decision != null ? decision.getIdleTimeout() : FLOWMOD_DEFAULT_IDLE_TIMEOUT,
+						decision != null ? decision.getHardTimeout() : FLOWMOD_DEFAULT_HARD_TIMEOUT);
 
                 /*
                  * Register this flowset with ingress and egress ports for link down
@@ -510,7 +516,9 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
             Path newPath = getNewPath(path);
             pushRoute(newPath, match, pi, sw.getId(), cookie,
                     cntx, requestFlowRemovedNotifn,
-                    OFFlowModCommand.ADD, packetOutSent);
+                    OFFlowModCommand.ADD, packetOutSent,
+					decision != null ? decision.getIdleTimeout() : FLOWMOD_DEFAULT_IDLE_TIMEOUT,
+					decision != null ? decision.getHardTimeout() : FLOWMOD_DEFAULT_HARD_TIMEOUT);
 
             /* Register flow sets */
             for (NodePortTuple npt : path.getPath()) {
@@ -718,7 +726,9 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 
             pushRoute(path, m, pi, sw.getId(), cookie,
                     cntx, requestFlowRemovedNotifn,
-                    OFFlowModCommand.ADD, false);
+                    OFFlowModCommand.ADD, false,
+					decision != null ? decision.getIdleTimeout() : FLOWMOD_DEFAULT_IDLE_TIMEOUT,
+					decision != null ? decision.getHardTimeout() : FLOWMOD_DEFAULT_HARD_TIMEOUT);
 
             /*
              * Register this flowset with ingress and egress ports for link down
@@ -994,8 +1004,8 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
         }
 
         fmb.setCookie(cookie)
-        .setHardTimeout(FLOWMOD_DEFAULT_HARD_TIMEOUT)
-        .setIdleTimeout(FLOWMOD_DEFAULT_IDLE_TIMEOUT)
+        .setHardTimeout(decision != null ? decision.getHardTimeout() : FLOWMOD_DEFAULT_HARD_TIMEOUT)
+        .setIdleTimeout(decision != null ? decision.getIdleTimeout() : FLOWMOD_DEFAULT_IDLE_TIMEOUT)
         .setBufferId(OFBufferId.NO_BUFFER) 
         .setMatch(m)
         .setPriority(FLOWMOD_DEFAULT_PRIORITY);
@@ -1015,6 +1025,63 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
         log.debug("OFMessage dampened: {}", dampened);
     }
 
+
+    /**
+     * Write PacketOut to switch to drop the tcp packet by sending RST
+     *
+     * @param sw The switch on which the packet was received
+     * @param pi The packet-in came from that switch
+     * @param decision The decision that cause drop flow, or null
+     * @param cntx The FloodlightContext associated with this OFPacketIn
+     */
+	protected void doDropFlowTcp(IOFSwitch sw, OFPacketIn pi, IRoutingDecision decision, FloodlightContext cntx){
+
+        Ethernet eth = IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
+        IPv4 ipv4 = (IPv4) eth.getPayload();
+		TCP tcp = (TCP) ipv4.getPayload();
+
+		// if the packet is already RST, we don't need to send another RST
+		if ((tcp.getFlags() & TCP.Flags.RST) != 0) {
+			doL2ForwardFlow(sw, pi, decision, cntx, false);
+			return;
+		}
+
+        OFPort inPort = OFMessageUtils.getInPort(pi);
+
+		IPacket ethout = new Ethernet()
+				.setSourceMACAddress(eth.getDestinationMACAddress())
+				.setDestinationMACAddress(eth.getSourceMACAddress())
+				.setEtherType(EthType.IPv4);
+		IPacket ipv4out = new IPv4()
+				.setSourceAddress(ipv4.getDestinationAddress())
+				.setDestinationAddress(ipv4.getSourceAddress())
+				.setProtocol(IpProtocol.TCP);
+
+		// must also send the ack
+		IPacket tcpout = new TCP()
+				.setSourcePort(tcp.getDestinationPort())
+				.setDestinationPort(tcp.getSourcePort())
+				.setFlags((short) (TCP.Flags.RST | TCP.Flags.ACK))
+				.setSequence(tcp.getAcknowledge())
+				.setAcknowledge(
+						tcp.getSequence() + (((tcp.getFlags() & TCP.Flags.SYN) != 0) ? 1
+								: tcp.getPayload().serialize().length))
+				.setWindowSize((short) 0)
+				.setChecksum((short) 0);
+
+		ipv4out.setPayload(tcpout);
+		ethout.setPayload(ipv4out);
+
+		byte[] packetdata = ethout.serialize();
+			
+		OFPacketOut po = sw.getOFFactory().buildPacketOut()
+			.setData(packetdata)
+			.setActions(Collections.singletonList((OFAction) sw.getOFFactory().actions().output(inPort, 0xffFFffFF)))
+			.setInPort(OFPort.CONTROLLER)
+			.build();
+		
+		messageDamper.write(sw, po);
+	}
 
     /**
      * Instead of using the Firewall's routing decision Match, which might be as general
