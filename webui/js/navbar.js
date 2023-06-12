@@ -10,6 +10,7 @@ document.getElementById("navMenu").innerHTML =
     //'<li><a href="routes.html"><i class="fa fa-link fa-fw"></i> Routes</a></li>'+
     '<li><a href="topology.html"><i class="fa fa-sitemap fa-fw"></i> Topology</a></li>'+
     '<li><a href="firewall.html"><i class="fa fa-warning fa-fw"></i> Firewall</a></li>'+
+    '<li><a href="exam.html"><i class="fa fa-book fa-fw"></i> Exam</a></li>'+
     '<li><a href="acl.html"><i class="fa fa-warning fa-fw"></i> Access Control Lists</a></li>'+
     '<li><a href="statistics.html"><i class="fa fa-bar-chart-o fa-fw"></i> Statistics</a></li>'+
     '<li><a data-toggle="modal" href="#login-modal"><i class="fa fa-sign-out"></i> Change Controllers</a></li>'+
